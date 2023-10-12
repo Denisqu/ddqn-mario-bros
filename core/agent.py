@@ -4,6 +4,8 @@ from torch import nn
 from tensordict import TensorDict
 from torchrl.data import TensorDictReplayBuffer, LazyMemmapStorage
 
+import copy
+
 class Mario:
     def __init__(self, state_dim, action_dim, save_dir):
         self.state_dim = state_dim
