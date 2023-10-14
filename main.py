@@ -10,7 +10,7 @@ if __name__ == '__main__':
     env = env_tuner.get_tuned_env()
     
     use_cuda = torch.cuda.is_available()
-    checkpoint_file_rel_path = "checkpoints\2023-10-14T19-36-58\mario_net_0.chkpt"
+    checkpoint_file_rel_path = "saved_checkpoints/2023-10-14T19-49-35/mario_net_0.chkpt"
     print(f"Using CUDA: {use_cuda}")
 
     save_dir = Path("checkpoints") / datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
@@ -21,14 +21,14 @@ if __name__ == '__main__':
     if os.path.exists(f'.\{checkpoint_file_rel_path}'):
          checkpoint = torch.load(checkpoint_file_rel_path)
          mario.net.load_state_dict(checkpoint['model'])
-         mario.exploration_rate = checkpoint['exploration_rate']
-         mario.curr_step = checkpoint["curr_step"]
+         #mario.exploration_rate = checkpoint['exploration_rate'] - 0.39
+         #mario.curr_step = checkpoint["curr_step"]
     else:
         print(f"no checkpoint found - ({checkpoint_file_rel_path})")
         
     logger = logging.MetricLogger(save_dir)
 
-    episodes = 4000
+    episodes = 40000
     for e in range(episodes):
         state = env.reset()
         # Play the game!
