@@ -23,8 +23,44 @@ class Mario:
         self.curr_step = 0
 
         self.save_every = 5e5  # no. of experiences between saving Mario Net
+        # TODO: что за TensorDictReplayBuffer?
         self.memory = TensorDictReplayBuffer(storage=LazyMemmapStorage(100000, device=torch.device("cpu")))
         self.batch_size = 32
+
+        self.gamma = 0.9
+        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=0.00025)
+        self.loss_fn = torch.nn.SmoothL1Loss()
+        self.burnin = 1e4  # min. experiences before training
+        self.learn_every = 3  # no. of experiences between updates to Q_online
+        self.sync_every = 1e4  # no. of experiences between Q_target & Q_online 
+    
+    # Объяснение TDE, TDT: https://www.reddit.com/r/MachineLearning/comments/3pzzrz/comment/cwb0nzo/?utm_source=share&utm_medium=web2x&context=3
+    def td_estimate(self, state, action):
+        # TODO: для чего здесь np.arrange? 
+        current_Q = self.net(state, model="online")[
+            np.arange(0, self.batch_size), action
+        ]  # Q_online(s,a)
+        return current_Q
+
+    @torch.no_grad()
+    def td_target(self, reward, next_state, done):
+        next_state_Q = self.net(next_state, model="online")
+        best_action = torch.argmax(next_state_Q, axis=1)
+        # TODO: для чего здесь np.arrange? 
+        next_Q = self.net(next_state, model="target")[
+            np.arange(0, self.batch_size), best_action
+        ]
+        return (reward + (1 - done.float()) * self.gamma * next_Q).float()
+    
+    def update_Q_online(self, td_estimate, td_target):
+        loss = self.loss_fn(td_estimate, td_target)
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+        return loss.item()
+
+    def sync_Q_target(self):
+        self.net.target.load_state_dict(self.net.online.state_dict())
 
     def act(self, state):
         """
@@ -89,41 +125,77 @@ class Mario:
 
     def learn(self):
         """Update online action value (Q) function with a batch of experiences"""
-        pass
+        if self.curr_step % self.sync_every == 0:
+            self.sync_Q_target()
 
-    class MarioNet(nn.Module):
-        """mini CNN structure
-        input -> (conv2d + relu) x 3 -> flatten -> (dense + relu) x 2 -> output
-        """
+        if self.curr_step % self.save_every == 0:
+            self.save()
 
-        def __init__(self, input_dim, output_dim):
-            super().__init__()
-            c, h, w = input_dim
+        if self.curr_step < self.burnin:
+            return None, None
 
-            if h != 84:
-                raise ValueError(f"Expecting input height: 84, got: {h}")
-            if w != 84:
-                raise ValueError(f"Expecting input width: 84, got: {w}")
+        if self.curr_step % self.learn_every != 0:
+            return None, None
 
-            # TODO: разобраться с Conv2d нейронками
-            self.online = nn.Sequential(
-                nn.Conv2d(in_channels=c, out_channels=32, kernel_size=8, stride=4),
-                nn.ReLU(),
-                nn.Conv2d(in_channels=32, out_channels=64, kernel_size=4, stride=2),
-                nn.ReLU(),
-                nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
-                nn.ReLU(),
-                nn.Flatten(),
-                nn.Linear(3136, 512),
-                nn.ReLU(),
-                nn.Linear(512, output_dim),
-            )
+        # Sample from memory
+        state, next_state, action, reward, done = self.recall()
 
-            self.target = copy.deepcopy(self.online)
+        # Get TD Estimate
+        td_est = self.td_estimate(state, action)
 
-            # Q_target parameters are frozen.
-            for p in self.target.parameters():
-                p.requires_grad = False
+        # Get TD Target
+        td_tgt = self.td_target(reward, next_state, done)
+
+        # Backpropagate loss through Q_online
+        loss = self.update_Q_online(td_est, td_tgt)
+
+        return (td_est.mean().item(), loss)
+
+    def save(self):
+        save_path = (
+            self.save_dir / f"mario_net_{int(self.curr_step // self.save_every)}.chkpt"
+        )
+        torch.save(
+            dict(model=self.net.state_dict(), exploration_rate=self.exploration_rate),
+            save_path,
+        )
+        print(f"MarioNet saved to {save_path} at step {self.curr_step}")
+
+
+class MarioNet(nn.Module):
+    """mini CNN structure
+    input -> (conv2d + relu) x 3 -> flatten -> (dense + relu) x 2 -> output
+    """
+
+    def __init__(self, input_dim, output_dim):
+        super().__init__()
+        c, h, w = input_dim
+
+        if h != 84:
+            raise ValueError(f"Expecting input height: 84, got: {h}")
+        if w != 84:
+            raise ValueError(f"Expecting input width: 84, got: {w}")
+
+        # TODO: разобраться с Conv2d нейронками
+        self.online = nn.Sequential(
+            nn.Conv2d(in_channels=c, out_channels=32, kernel_size=8, stride=4),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
+            nn.ReLU(),
+            # TODO: что за nn.Flatten?
+            nn.Flatten(),
+            nn.Linear(3136, 512),
+            nn.ReLU(),
+            nn.Linear(512, output_dim),
+        )
+
+        self.target = copy.deepcopy(self.online)
+
+        # Q_target parameters are frozen.
+        for p in self.target.parameters():
+            p.requires_grad = False
 
     def forward(self, input, model):
         if model == "online":
