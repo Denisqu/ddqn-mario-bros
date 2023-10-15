@@ -1,15 +1,19 @@
 from nes_py.wrappers import JoypadSpace
 import gym_super_mario_bros
-from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
+from gym_super_mario_bros.actions import SIMPLE_MOVEMENT, RIGHT_ONLY, COMPLEX_MOVEMENT
 
 from utils.wrappers import obs_wrappers as o_w
 from utils.wrappers import custom_wrappers as c_w
 from gym.wrappers import FrameStack
 
 def get_tuned_env():
-    env = gym_super_mario_bros.make('SuperMarioBros-v3')
+    #if gym.__version__ < '0.26':
+    #    env = gym_super_mario_bros.make("SuperMarioBros-1-1-v0", new_step_api=True)
+    #else:
+    env = gym_super_mario_bros.make("SuperMarioBros-1-1-v2")
     env = c_w.SkipFrame(env, skip=4)
     env = o_w.GrayScaleObservation(env)
+    env = o_w.ResizeObservation(env, shape=84)
     env = JoypadSpace(env, SIMPLE_MOVEMENT)
     
     """FrameStack is a wrapper that allows us to squash
