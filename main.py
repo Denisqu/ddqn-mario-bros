@@ -10,7 +10,7 @@ if __name__ == '__main__':
     env = env_tuner.get_tuned_env()
     
     use_cuda = torch.cuda.is_available()
-    checkpoint_file_rel_path = "saved_checkpoints/2023-10-14T19-49-35/mario_net_0.chkpt"
+    checkpoint_file_rel_path = "C:/git repos/python-projects/ddqn-mario-bros/checkpoints/2023-10-14T21-18-14/mario_net_3.chkpt"
     print(f"Using CUDA: {use_cuda}")
 
     save_dir = Path("checkpoints") / datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
@@ -18,7 +18,7 @@ if __name__ == '__main__':
 
     mario = agent.Mario(state_dim=(4, 84, 84), action_dim=env.action_space.n, save_dir=save_dir)
 
-    if os.path.exists(f'.\{checkpoint_file_rel_path}'):
+    if os.path.exists(f'{checkpoint_file_rel_path}'):
          checkpoint = torch.load(checkpoint_file_rel_path)
          mario.net.load_state_dict(checkpoint['model'])
          #mario.exploration_rate = checkpoint['exploration_rate'] - 0.39
@@ -39,7 +39,7 @@ if __name__ == '__main__':
             
             # Agent performs action
             next_state, reward, done, info = env.step(action)
-            #env.render()
+            env.render()
 
             # Remember
             mario.cache(state, next_state, action, reward, done)
