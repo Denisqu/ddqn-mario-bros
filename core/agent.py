@@ -17,9 +17,9 @@ class Mario:
         self.net = MarioNet(self.state_dim, self.action_dim).float()
         self.net = self.net.to(device=self.device)
 
-        self.exploration_rate = 1
+        self.exploration_rate = 0.5 - 0.49
         self.exploration_rate_decay = 0.99999975
-        self.exploration_rate_min = 0.1
+        self.exploration_rate_min = 0.1 - 0.099
         self.curr_step = 0
 
         self.save_every = 5e5  # no. of experiences between saving Mario Net
@@ -155,7 +155,10 @@ class Mario:
             self.save_dir / f"mario_net_{int(self.curr_step // self.save_every)}.chkpt"
         )
         torch.save(
-            dict(model=self.net.state_dict(), exploration_rate=self.exploration_rate),
+            dict(model=self.net.state_dict(),
+                    exploration_rate=self.exploration_rate,
+                    curr_step=self.curr_step
+                 ),
             save_path,
         )
         print(f"MarioNet saved to {save_path} at step {self.curr_step}")
