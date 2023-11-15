@@ -36,7 +36,7 @@ class Mario:
     
     # Объяснение TDE, TDT: https://www.reddit.com/r/MachineLearning/comments/3pzzrz/comment/cwb0nzo/?utm_source=share&utm_medium=web2x&context=3
     def td_estimate(self, state, action):
-        # TODO: для чего здесь np.arrange? 
+        # https://stackoverflow.com/questions/70458347/what-is-the-purpose-of-np-arange0-self-batch-size-action-after-the-neural
         current_Q = self.net(state, model="online")[
             np.arange(0, self.batch_size), action
         ]  # Q_online(s,a)
@@ -46,7 +46,6 @@ class Mario:
     def td_target(self, reward, next_state, done):
         next_state_Q = self.net(next_state, model="online")
         best_action = torch.argmax(next_state_Q, axis=1)
-        # TODO: для чего здесь np.arrange? 
         next_Q = self.net(next_state, model="target")[
             np.arange(0, self.batch_size), best_action
         ]
